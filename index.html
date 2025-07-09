@@ -1,0 +1,1023 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Automata Theory Conversion Simulator</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+
+    <style type="text/tailwindcss">
+        @theme {
+            --color-primary: #3b82f6; /* blue-500 */
+            --color-secondary: #6b7280; /* gray-500 */
+            --color-success: #22c55e; /* green-500 */
+            --color-danger: #ef4444; /* red-500 */
+            --color-warning: #f59e0b; /* amber-500 */
+            --color-background: #111827; /* gray-900 */
+            --color-panel: #1f2937; /* gray-800 */
+            --color-text: #d1d5db; /* gray-300 */
+            --color-text-dim: #9ca3af; /* gray-400 */
+            --color-border: #374151; /* gray-700 */
+        }
+
+        body {
+            @apply bg-background text-text font-sans;
+        }
+
+        .panel {
+            @apply bg-panel border border-border rounded-lg shadow-lg p-4;
+        }
+
+        .btn {
+            @apply px-4 py-2 rounded-md font-semibold text-white transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-background;
+        }
+
+        .btn-primary {
+            @apply bg-primary hover:bg-blue-600 focus:ring-primary;
+        }
+        
+        .btn-secondary {
+            @apply bg-secondary hover:bg-gray-600 focus:ring-secondary;
+        }
+
+        .btn-danger {
+            @apply bg-danger hover:bg-red-600 focus:ring-danger;
+        }
+        
+        .btn:disabled {
+            @apply bg-gray-600 cursor-not-allowed opacity-50;
+        }
+
+        .input-field {
+            @apply w-full bg-background border border-border rounded-md p-2 focus:ring-primary focus:border-primary;
+        }
+        
+        #log-output p {
+            @apply p-2 border-b border-border text-sm;
+        }
+        
+        #log-output p:last-child {
+            @apply border-b-0;
+        }
+        
+        #log-output p.log-step {
+            @apply bg-gray-900/50;
+        }
+        
+        #log-output p.log-info {
+            @apply text-blue-400;
+        }
+
+        #log-output p.log-success {
+            @apply text-success;
+        }
+        
+        #log-output p.log-error {
+            @apply text-danger;
+        }
+
+        .minimization-table {
+            @apply w-full text-center text-sm;
+        }
+        .minimization-table th, .minimization-table td {
+            @apply border border-border p-2;
+        }
+        .minimization-table th {
+            @apply bg-gray-700;
+        }
+        .minimization-table td.marked {
+            @apply bg-danger/50 text-lg;
+        }
+        .minimization-table td.unmarked {
+            @apply bg-success/20;
+        }
+
+    </style>
+</head>
+<body class="antialiased">
+
+    <div class="container mx-auto p-4 lg:p-6">
+        <header class="text-center mb-6">
+            <h1 class="text-3xl lg:text-4xl font-bold text-white">Automata Theory Conversion Simulator</h1>
+            <p class="text-text-dim mt-2">An interactive tool for visualizing automata conversions.</p>
+        </header>
+
+        <main class="grid grid-cols-1 lg:grid-cols-5 gap-6">
+            
+            <div class="lg:col-span-2 flex flex-col gap-6">
+                <section id="input-panel" class="panel flex-grow flex flex-col">
+                    <h2 class="text-xl font-semibold mb-3 text-white">1. Input</h2>
+                    <div class="flex items-center gap-4 mb-3">
+                        <label for="inputType" class="font-medium">Input Type:</label>
+                        <select id="inputType" class="input-field flex-grow">
+                            <option value="re">Regular Expression</option>
+                            <option value="nfa">NFA (JSON)</option>
+                            <option value="dfa">DFA (JSON)</option>
+                        </select>
+                    </div>
+                    <textarea id="inputData" class="input-field flex-grow h-48 font-mono text-sm" placeholder="(a|b)*a"></textarea>
+                    <div class="mt-4">
+                        <h3 class="font-semibold mb-2 text-white">Load Examples:</h3>
+                        <div class="flex flex-wrap gap-2">
+                            <button id="loadReExample" class="btn btn-secondary text-xs">RE: (a|b)*a</button>
+                            <button id="loadNfaExample" class="btn btn-secondary text-xs">NFA for (a|b)*a</button>
+                            <button id="loadDfaExample" class="btn btn-secondary text-xs">DFA to Minimize</button>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="controls-panel" class="panel">
+                    <h2 class="text-xl font-semibold mb-3 text-white">2. Conversion Controls</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+                        <button id="btnReToNfa" class="btn btn-primary">RE → ε-NFA</button>
+                        <button id="btnNfaToDfa" class="btn btn-primary">NFA → DFA</button>
+                        <button id="btnDfaMinimize" class="btn btn-primary">Minimize DFA</button>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <button id="btnRunAll" class="btn btn-secondary">Run All Steps</button>
+                        <button id="btnNextStep" class="btn btn-secondary">Next Step</button>
+                        <button id="btnReset" class="btn btn-danger">Reset</button>
+                    </div>
+                </section>
+            </div>
+
+            <div class="lg:col-span-3 flex flex-col gap-6">
+                <section id="visualization-panel" class="panel h-[450px] flex flex-col">
+                    <h2 class="text-xl font-semibold mb-3 text-white">3. Visualization</h2>
+                    <div id="graph-container" class="flex-grow w-full h-full bg-gray-900/50 rounded-md"></div>
+                    <div id="table-container" class="hidden flex-grow w-full h-full overflow-auto"></div>
+                </section>
+
+                <section id="explanation-panel" class="panel h-[450px] flex flex-col">
+                    <h2 class="text-xl font-semibold mb-3 text-white">4. Explanation Log</h2>
+                    <div id="log-output" class="flex-grow bg-gray-900/50 rounded-md overflow-y-auto">
+                        <p class="text-text-dim italic">Logs will appear here...</p>
+                    </div>
+                </section>
+            </div>
+
+        </main>
+    </div>
+
+    <script>
+    (() => {
+        /**
+         * --------------------------------------------------------------------
+         * Module III: Conversion Engine
+         * Contains the core logic for all automata conversion algorithms.
+         * Each major function is a generator to allow for step-by-step execution.
+         * --------------------------------------------------------------------
+         */
+        const ConversionEngine = {
+            /**
+             * Inserts an explicit concatenation operator '.' into a regular expression.
+             * This is a required preprocessing step for conversion to postfix notation.
+             * It ensures that 'ab' is treated as 'a.b' and '(a|b)c' as '(a|b).c'.
+             * @param {string} re - The input regular expression.
+             * @returns {string} The regular expression with explicit concatenation.
+             */
+            insertExplicitConcat: (re) => {
+                let output = '';
+                for (let i = 0; i < re.length; i++) {
+                    const char = re[i];
+                    output += char;
+                    if (i + 1 < re.length) {
+                        const nextChar = re[i + 1];
+                        // Insert '.' if current char is an operand/closer and next is an operand/opener
+                        if (
+                            (char.match(/[a-zA-Z0-9ε]/) || char === ')' || char === '*') &&
+                            (nextChar.match(/[a-zA-Z0-9ε]/) || nextChar === '(')
+                        ) {
+                            output += '.';
+                        }
+                    }
+                }
+                return output;
+            },
+
+            /**
+             * Converts an infix regular expression to postfix notation using the Shunting-yard algorithm.
+             * This simplifies the process of building an NFA by handling operator precedence correctly.
+             * @param {string} re - The infix regular expression (with explicit concatenation).
+             * @returns {string} The postfix regular expression.
+             */
+            reToPostfix: (re) => {
+                const precedence = { '|': 1, '.': 2, '*': 3 };
+                let output = '';
+                const operatorStack = [];
+
+                for (const char of re) {
+                    if (char.match(/[a-zA-Z0-9ε]/)) {
+                        output += char;
+                    } else if (char === '(') {
+                        operatorStack.push(char);
+                    } else if (char === ')') {
+                        while (operatorStack.length > 0 && operatorStack[operatorStack.length - 1] !== '(') {
+                            output += operatorStack.pop();
+                        }
+                        operatorStack.pop(); // Pop '('
+                    } else { // Operator
+                        while (
+                            operatorStack.length > 0 &&
+                            operatorStack[operatorStack.length - 1] !== '(' &&
+                            precedence[operatorStack[operatorStack.length - 1]] >= precedence[char]
+                        ) {
+                            output += operatorStack.pop();
+                        }
+                        operatorStack.push(char);
+                    }
+                }
+
+                while (operatorStack.length > 0) {
+                    output += operatorStack.pop();
+                }
+                return output;
+            },
+
+            /**
+             * [Generator] Implements Thompson's Construction to convert a postfix RE to an ε-NFA.
+             * It processes the postfix expression token by token, building up the NFA on a stack.
+             * Each step yields the current state of the NFA and a log message. [7, 8]
+             * @param {string} postfixRe - The postfix regular expression.
+             */
+            *thompson(postfixRe) {
+                let stateCounter = 0;
+                const nfaStack = [];
+
+                const createNfaForSymbol = (symbol) => {
+                    const startState = `q${stateCounter++}`;
+                    const finalState = `q${stateCounter++}`;
+                    return {
+                        states: [startState, finalState],
+                        alphabet: symbol !== 'ε' ? [symbol] : [],
+                        transitions: [{ from: startState, to: finalState, symbol: symbol }],
+                        startState: startState,
+                        finalStates: [finalState],
+                    };
+                };
+
+                yield { log: `Starting Thompson's Construction for postfix RE: "${postfixRe}"` };
+
+                for (const char of postfixRe) {
+                    if (char.match(/[a-zA-Z0-9ε]/)) {
+                        const nfa = createNfaForSymbol(char);
+                        nfaStack.push(nfa);
+                        yield { log: `Pushed NFA for symbol '${char}'`, automaton: nfa };
+                    } else if (char === '*') { // Kleene Star
+                        const nfa1 = nfaStack.pop();
+                        const startState = `q${stateCounter++}`;
+                        const finalState = `q${stateCounter++}`;
+                        
+                        const newTransitions = [
+                            ...nfa1.transitions,
+                            { from: startState, to: nfa1.startState, symbol: 'ε' },
+                            { from: nfa1.finalStates[0], to: finalState, symbol: 'ε' },
+                            { from: nfa1.finalStates[0], to: nfa1.startState, symbol: 'ε' },
+                            { from: startState, to: finalState, symbol: 'ε' },
+                        ];
+
+                        const newNfa = {
+                            states: [...nfa1.states, startState, finalState],
+                            alphabet: nfa1.alphabet,
+                            transitions: newTransitions,
+                            startState: startState,
+                            finalStates: [finalState],
+                        };
+                        nfaStack.push(newNfa);
+                        yield { log: `Applied Kleene Star (*) operation`, automaton: newNfa };
+                    } else if (char === '.') { // Concatenation
+                        const nfa2 = nfaStack.pop();
+                        const nfa1 = nfaStack.pop();
+                        
+                        const newTransitions = [
+                            ...nfa1.transitions,
+                            ...nfa2.transitions,
+                            { from: nfa1.finalStates[0], to: nfa2.startState, symbol: 'ε' },
+                        ];
+                        
+                        const newNfa = {
+                            states: [...nfa1.states, ...nfa2.states],
+                            alphabet: [...new Set([...nfa1.alphabet, ...nfa2.alphabet])],
+                            transitions: newTransitions,
+                            startState: nfa1.startState,
+                            finalStates: nfa2.finalStates,
+                        };
+                        nfaStack.push(newNfa);
+                        yield { log: `Applied Concatenation (.) operation`, automaton: newNfa };
+                    } else if (char === '|') { // Union
+                        const nfa2 = nfaStack.pop();
+                        const nfa1 = nfaStack.pop();
+                        const startState = `q${stateCounter++}`;
+                        const finalState = `q${stateCounter++}`;
+
+                        const newTransitions = [
+                            ...nfa1.transitions,
+                            ...nfa2.transitions,
+                            { from: startState, to: nfa1.startState, symbol: 'ε' },
+                            { from: startState, to: nfa2.startState, symbol: 'ε' },
+                            { from: nfa1.finalStates[0], to: finalState, symbol: 'ε' },
+                            { from: nfa2.finalStates[0], to: finalState, symbol: 'ε' },
+                        ];
+                        
+                        const newNfa = {
+                            states: [...nfa1.states, ...nfa2.states, startState, finalState],
+                            alphabet: [...new Set([...nfa1.alphabet, ...nfa2.alphabet])],
+                            transitions: newTransitions,
+                            startState: startState,
+                            finalStates: [finalState],
+                        };
+                        nfaStack.push(newNfa);
+                        yield { log: `Applied Union (|) operation`, automaton: newNfa };
+                    }
+                }
+
+                const finalNfa = nfaStack.pop();
+                yield { log: `Construction complete. Final ε-NFA generated.`, automaton: finalNfa, isFinal: true };
+                return finalNfa;
+            },
+
+            /**
+             * [Generator] Implements the Subset Construction algorithm to convert an NFA to a DFA.
+             * It iteratively builds DFA states from sets of NFA states, starting with the ε-closure of the NFA's start state.
+             * Each step yields the partially constructed DFA and a log message. [9, 10]
+             * @param {object} nfa - The input NFA in the standard JSON format.
+             */
+            *subsetConstruction(nfa) {
+                const epsilonClosureCache = new Map();
+                const getEpsilonClosure = (states) => {
+                    const key = [...states].sort().join(',');
+                    if (epsilonClosureCache.has(key)) return epsilonClosureCache.get(key);
+
+                    const closure = new Set(states);
+                    const queue = [...states];
+                    while (queue.length > 0) {
+                        const currentState = queue.shift();
+                        nfa.transitions.forEach(t => {
+                            if (t.from === currentState && t.symbol === 'ε' && !closure.has(t.to)) {
+                                closure.add(t.to);
+                                queue.push(t.to);
+                            }
+                        });
+                    }
+                    epsilonClosureCache.set(key, closure);
+                    return closure;
+                };
+
+                const move = (states, symbol) => {
+                    const reachable = new Set();
+                    states.forEach(state => {
+                        nfa.transitions.forEach(t => {
+                            if (t.from === state && t.symbol === symbol) {
+                                reachable.add(t.to);
+                            }
+                        });
+                    });
+                    return reachable;
+                };
+
+                const dfa = {
+                    states: [],
+                    alphabet: nfa.alphabet.filter(s => s !== 'ε'),
+                    transitions: [],
+                    startState: '',
+                    finalStates: [],
+                };
+
+                const dfaStateMap = new Map(); // Maps set of NFA states to DFA state name
+                const unmarkedStates = [];
+                let dfaStateCounter = 0;
+
+                const initialNfaStates = getEpsilonClosure(new Set([nfa.startState]));
+                const initialDfaStateName = `D${dfaStateCounter++}`;
+                dfa.startState = initialDfaStateName;
+                dfa.states.push(initialDfaStateName);
+                dfaStateMap.set([...initialNfaStates].sort().join(','), initialDfaStateName);
+                unmarkedStates.push(initialNfaStates);
+
+                yield {
+                    log: `Initial DFA state ${initialDfaStateName} = ε-closure({${nfa.startState}}) = {${[...initialNfaStates].sort().join(', ')}}`,
+                    automaton: dfa
+                };
+
+                while (unmarkedStates.length > 0) {
+                    const currentNfaStates = unmarkedStates.shift();
+                    const currentDfaStateName = dfaStateMap.get([...currentNfaStates].sort().join(','));
+
+                    for (const symbol of dfa.alphabet) {
+                        const moveResult = move(currentNfaStates, symbol);
+                        yield {
+                            log: `For state ${currentDfaStateName} and symbol '${symbol}', calculating move({${[...currentNfaStates].sort().join(', ')}}) = {${[...moveResult].sort().join(', ')}}`,
+                            automaton: dfa
+                        };
+                        
+                        if (moveResult.size === 0) {
+                            yield {
+                                log: `Move result is empty. No transition from ${currentDfaStateName} on '${symbol}'.`,
+                                automaton: dfa
+                            };
+                            continue;
+                        }
+
+                        const nextNfaStates = getEpsilonClosure(moveResult);
+                        yield {
+                            log: `Then, ε-closure of result = {${[...nextNfaStates].sort().join(', ')}}`,
+                            automaton: dfa
+                        };
+
+                        const nextNfaStatesKey = [...nextNfaStates].sort().join(',');
+                        let nextDfaStateName;
+
+                        if (dfaStateMap.has(nextNfaStatesKey)) {
+                            nextDfaStateName = dfaStateMap.get(nextNfaStatesKey);
+                            yield {
+                                log: `This set of NFA states corresponds to existing DFA state ${nextDfaStateName}.`,
+                                automaton: dfa
+                            };
+                        } else {
+                            nextDfaStateName = `D${dfaStateCounter++}`;
+                            dfa.states.push(nextDfaStateName);
+                            dfaStateMap.set(nextNfaStatesKey, nextDfaStateName);
+                            unmarkedStates.push(nextNfaStates);
+                            yield {
+                                log: `This is a new DFA state. Naming it ${nextDfaStateName}.`,
+                                automaton: dfa
+                            };
+                        }
+                        
+                        dfa.transitions.push({ from: currentDfaStateName, to: nextDfaStateName, symbol });
+                    }
+                }
+
+                // Determine final states
+                dfaStateMap.forEach((dfaName, nfaStatesKey) => {
+                    const nfaStates = nfaStatesKey.split(',');
+                    if (nfaStates.some(s => nfa.finalStates.includes(s))) {
+                        dfa.finalStates.push(dfaName);
+                    }
+                });
+
+                yield {
+                    log: `Subset construction complete. Final DFA has ${dfa.states.length} states. Final states are {${dfa.finalStates.join(', ')}}.`,
+                    automaton: dfa,
+                    isFinal: true
+                };
+                return dfa;
+            },
+
+            /**
+             * [Generator] Implements the Table-Filling algorithm (based on Myhill-Nerode theorem) to minimize a DFA.
+             * It first removes unreachable states, then iteratively marks pairs of distinguishable states.
+             * Finally, it merges the remaining indistinguishable states. [11, 12, 13, 14]
+             * @param {object} dfa - The input DFA in the standard JSON format.
+             */
+            *minimizeDfaTableFilling(dfa) {
+                // Step 1: Remove unreachable states
+                const reachableStates = new Set([dfa.startState]);
+                const queue = [dfa.startState];
+                while(queue.length > 0) {
+                    const state = queue.shift();
+                    dfa.alphabet.forEach(symbol => {
+                        const transition = dfa.transitions.find(t => t.from === state && t.symbol === symbol);
+                        if (transition && !reachableStates.has(transition.to)) {
+                            reachableStates.add(transition.to);
+                            queue.push(transition.to);
+                        }
+                    });
+                }
+
+                const originalStateCount = dfa.states.length;
+                const filteredDfa = {
+                    states: [...reachableStates].sort(),
+                    alphabet: dfa.alphabet,
+                    transitions: dfa.transitions.filter(t => reachableStates.has(t.from) && reachableStates.has(t.to)),
+                    startState: dfa.startState,
+                    finalStates: dfa.finalStates.filter(s => reachableStates.has(s))
+                };
+                
+                if (filteredDfa.states.length < originalStateCount) {
+                     yield {
+                        log: `Removed ${originalStateCount - filteredDfa.states.length} unreachable states. Continuing with ${filteredDfa.states.length} states.`,
+                        automaton: filteredDfa
+                    };
+                } else {
+                    yield { log: `All states are reachable.`, automaton: filteredDfa };
+                }
+                
+                const states = filteredDfa.states;
+                const finalStates = new Set(filteredDfa.finalStates);
+                let distinguishable = {}; // Using an object as a 2D map
+
+                // Initialize table
+                for (let i = 0; i < states.length; i++) {
+                    for (let j = 0; j < i; j++) {
+                        distinguishable[`${states[i]}|${states[j]}`] = false;
+                    }
+                }
+                
+                yield { log: `Initialized distinguishability table for all state pairs.`, table: {dfa: filteredDfa, table: distinguishable} };
+
+                // Step 2: Mark pairs where one is final and the other is not
+                for (let i = 0; i < states.length; i++) {
+                    for (let j = 0; j < i; j++) {
+                        const p = states[i];
+                        const q = states[j];
+                        if (finalStates.has(p) !== finalStates.has(q)) {
+                            distinguishable[`${p}|${q}`] = true;
+                        }
+                    }
+                }
+                yield { log: `Marked pairs where one state is final and the other is not.`, table: {dfa: filteredDfa, table: distinguishable} };
+
+
+                // Step 3: Iteratively mark more pairs
+                let changed;
+                do {
+                    changed = false;
+                    for (let i = 0; i < states.length; i++) {
+                        for (let j = 0; j < i; j++) {
+                            const p = states[i];
+                            const q = states[j];
+                            if (distinguishable[`${p}|${q}`]) continue;
+
+                            for (const symbol of filteredDfa.alphabet) {
+                                const p_next = filteredDfa.transitions.find(t => t.from === p && t.symbol === symbol)?.to;
+                                const q_next = filteredDfa.transitions.find(t => t.from === q && t.symbol === symbol)?.to;
+
+                                if (p_next && q_next && p_next !== q_next) {
+                                    const key = [p_next, q_next].sort().join('|');
+                                    if (distinguishable[key]) {
+                                        distinguishable[`${p}|${q}`] = true;
+                                        changed = true;
+                                        yield { log: `Marked pair (${q}, ${p}): on symbol '${symbol}', they transition to the distinguishable pair (${q_next}, ${p_next}).`, table: {dfa: filteredDfa, table: distinguishable} };
+                                        break; // To next pair
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } while (changed);
+                
+                yield { log: `Table filling complete. Unmarked pairs are indistinguishable.`, table: {dfa: filteredDfa, table: distinguishable} };
+
+                // Step 4: Combine indistinguishable states
+                const partitions = [];
+                const visited = new Set();
+                for (const state of states) {
+                    if (visited.has(state)) continue;
+                    const newPartition = new Set([state]);
+                    visited.add(state);
+                    for (const otherState of states) {
+                        if (!visited.has(otherState) && state !== otherState) {
+                             const key = [state, otherState].sort().join('|');
+                            if (!distinguishable[key]) {
+                                newPartition.add(otherState);
+                                visited.add(otherState);
+                            }
+                        }
+                    }
+                    partitions.push(newPartition);
+                }
+
+                yield { log: `Identified ${partitions.length} partitions (equivalence classes) of states.` };
+
+                // Step 5: Build the minimized DFA
+                const stateToPartitionMap = new Map();
+                const minimizedDfa = {
+                    states: [],
+                    alphabet: filteredDfa.alphabet,
+                    transitions: [],
+                    startState: '',
+                    finalStates: []
+                };
+
+                partitions.forEach((partition) => {
+                    const newStateName = `{${[...partition].sort().join(',')}}`;
+                    minimizedDfa.states.push(newStateName);
+                    partition.forEach(state => {
+                        stateToPartitionMap.set(state, newStateName);
+                    });
+                });
+
+                minimizedDfa.startState = stateToPartitionMap.get(filteredDfa.startState);
+                
+                const finalPartitions = new Set();
+                partitions.forEach(partition => {
+                     const partitionArr = [...partition];
+                     if(partitionArr.some(s => finalStates.has(s))) {
+                        finalPartitions.add(stateToPartitionMap.get(partitionArr[0]));
+                     }
+                });
+                minimizedDfa.finalStates = [...finalPartitions];
+
+
+                partitions.forEach(partition => {
+                    const representative = [...partition][0];
+                    const fromState = stateToPartitionMap.get(representative);
+                    filteredDfa.alphabet.forEach(symbol => {
+                        const transition = filteredDfa.transitions.find(t => t.from === representative && t.symbol === symbol);
+                        if (transition) {
+                            const toState = stateToPartitionMap.get(transition.to);
+                            if (!minimizedDfa.transitions.some(t => t.from === fromState && t.to === toState && t.symbol === symbol)) {
+                                minimizedDfa.transitions.push({ from: fromState, to: toState, symbol });
+                            }
+                        }
+                    });
+                });
+                
+                yield { log: `Constructed the final minimized DFA.`, automaton: minimizedDfa, isFinal: true };
+                return minimizedDfa;
+            }
+        };
+
+        /**
+         * --------------------------------------------------------------------
+         * Module II: Graph Manager & Visualization Utilities
+         * Handles all interactions with the vis-network.js library.
+         * Translates internal automaton format to vis.js data format.
+         * Renders both graphs and the DFA minimization table.
+         * --------------------------------------------------------------------
+         */
+        const GraphManager = {
+            network: null,
+            
+            init(container) {
+                const options = {
+                    nodes: {
+                        shape: 'circle',
+                        font: { size: 16, color: '#FFFFFF' },
+                        borderWidth: 2,
+                        shadow: true,
+                    },
+                    edges: {
+                        arrows: 'to',
+                        font: { align: 'top', size: 14, color: '#FFFFFF' },
+                        smooth: { type: 'curvedCW', roundness: 0.1 },
+                        color: {
+                            color: '#848484',
+                            highlight: '#a3e635',
+                            hover: '#60a5fa'
+                        }
+                    },
+                    physics: {
+                        solver: 'forceAtlas2Based',
+                        forceAtlas2Based: {
+                            gravitationalConstant: -50,
+                            centralGravity: 0.01,
+                            springLength: 100,
+                            springConstant: 0.08,
+                        },
+                        minVelocity: 0.75,
+                        stabilization: { iterations: 150 }
+                    },
+                    interaction: {
+                        dragNodes: true,
+                        dragView: true,
+                        hover: true,
+                    },
+                    layout: {
+                        hierarchical: false
+                    }
+                };
+                this.network = new vis.Network(container, {}, options);
+            },
+            
+            /**
+             * Converts an automaton in internal JSON format to vis.js data format.
+             * Applies specific styling for start and final states. [15, 16]
+             * @param {object} automaton - The automaton to draw.
+             * @returns {object} - An object with `nodes` and `edges` arrays for vis.js.
+             */
+            toVisData(automaton) {
+                if (!automaton || !automaton.states) return { nodes: [], edges: [] };
+                
+                const nodes = automaton.states.map(state => {
+                    const isStart = state === automaton.startState;
+                    const isFinal = automaton.finalStates.includes(state);
+                    
+                    let node = {
+                        id: state,
+                        label: state,
+                        color: {
+                            border: isStart ? '#4ade80' : '#3b82f6', // green-400 or blue-500
+                            background: '#374151', // gray-700
+                            highlight: { border: '#a3e635', background: '#475569' },
+                            hover: { border: '#60a5fa', background: '#475569' }
+                        }
+                    };
+                    
+                    if (isFinal) {
+                        node.borderWidth = 4;
+                        node.shape = 'double-border';
+                    }
+                    
+                    return node;
+                });
+
+                const edges = automaton.transitions.map((t, i) => ({
+                    id: `e${i}`,
+                    from: t.from,
+                    to: t.to,
+                    label: t.symbol
+                }));
+
+                return { nodes, edges };
+            },
+
+            draw(automaton) {
+                const data = this.toVisData(automaton);
+                this.network.setData(data);
+                document.getElementById('graph-container').classList.remove('hidden');
+                document.getElementById('table-container').classList.add('hidden');
+            },
+            
+            /**
+             * Renders the HTML table for the DFA minimization algorithm.
+             * @param {object} data - Contains the DFA and the distinguishability table.
+             */
+            drawMinimizationTable(data) {
+                const { dfa, table } = data;
+                const container = document.getElementById('table-container');
+                container.innerHTML = '';
+                
+                const states = dfa.states;
+                const htmlTable = document.createElement('table');
+                htmlTable.className = 'minimization-table';
+
+                // Header row
+                const header = htmlTable.createTHead().insertRow();
+                header.insertCell(); // Empty top-left corner
+                for (let j = 0; j < states.length - 1; j++) {
+                    const th = document.createElement('th');
+                    th.textContent = states[j];
+                    header.appendChild(th);
+                }
+
+                // Data rows
+                const body = htmlTable.createTBody();
+                for (let i = 1; i < states.length; i++) {
+                    const row = body.insertRow();
+                    const th = document.createElement('th');
+                    th.textContent = states[i];
+                    row.appendChild(th);
+                    for (let j = 0; j < i; j++) {
+                        const cell = row.insertCell();
+                        const key = `${states[i]}|${states[j]}`;
+                        cell.id = `cell-${key}`;
+                        if (table[key]) {
+                            cell.textContent = 'X';
+                            cell.className = 'marked';
+                        } else {
+                            cell.className = 'unmarked';
+                        }
+                    }
+                }
+                
+                container.appendChild(htmlTable);
+                document.getElementById('graph-container').classList.add('hidden');
+                container.classList.remove('hidden');
+            }
+        };
+
+        /**
+         * --------------------------------------------------------------------
+         * Module I: App Controller & State Management
+         * Orchestrates the application, manages state, and handles UI events.
+         * --------------------------------------------------------------------
+         */
+        const AppController = {
+            dom: {},
+            state: {
+                currentAutomaton: null,
+                conversionGenerator: null,
+                isComplete: false,
+            },
+            
+            init() {
+                this.dom = {
+                    inputType: document.getElementById('inputType'),
+                    inputData: document.getElementById('inputData'),
+                    btnReToNfa: document.getElementById('btnReToNfa'),
+                    btnNfaToDfa: document.getElementById('btnNfaToDfa'),
+                    btnDfaMinimize: document.getElementById('btnDfaMinimize'),
+                    btnRunAll: document.getElementById('btnRunAll'),
+                    btnNextStep: document.getElementById('btnNextStep'),
+                    btnReset: document.getElementById('btnReset'),
+                    loadReExample: document.getElementById('loadReExample'),
+                    loadNfaExample: document.getElementById('loadNfaExample'),
+                    loadDfaExample: document.getElementById('loadDfaExample'),
+                    logOutput: document.getElementById('log-output'),
+                    graphContainer: document.getElementById('graph-container'),
+                    tableContainer: document.getElementById('table-container'),
+                };
+                
+                GraphManager.init(this.dom.graphContainer);
+                this.addEventListeners();
+                this.updateButtonStates();
+                this.log('Welcome! Select an input type and enter data, or load an example.', 'info');
+            },
+            
+            addEventListeners() {
+                this.dom.inputType.addEventListener('change', this.handleInputTypeChange.bind(this));
+                this.dom.btnReToNfa.addEventListener('click', () => this.startConversion('re-to-nfa'));
+                this.dom.btnNfaToDfa.addEventListener('click', () => this.startConversion('nfa-to-dfa'));
+                this.dom.btnDfaMinimize.addEventListener('click', () => this.startConversion('dfa-minimize'));
+                this.dom.btnNextStep.addEventListener('click', this.handleNextStep.bind(this));
+                this.dom.btnRunAll.addEventListener('click', this.handleRunAll.bind(this));
+                this.dom.btnReset.addEventListener('click', this.reset.bind(this));
+                
+                this.dom.loadReExample.addEventListener('click', this.loadReExample.bind(this));
+                this.dom.loadNfaExample.addEventListener('click', this.loadNfaExample.bind(this));
+                this.dom.loadDfaExample.addEventListener('click', this.loadDfaExample.bind(this));
+            },
+            
+            log(message, type = 'step') {
+                if (this.dom.logOutput.firstElementChild && this.dom.logOutput.firstElementChild.textContent.includes('Logs will appear here')) {
+                    this.dom.logOutput.innerHTML = '';
+                }
+                const p = document.createElement('p');
+                p.textContent = message;
+                p.className = `log-${type}`;
+                this.dom.logOutput.appendChild(p);
+                this.dom.logOutput.scrollTop = this.dom.logOutput.scrollHeight;
+            },
+            
+            reset() {
+                this.state.currentAutomaton = null;
+                this.state.conversionGenerator = null;
+                this.state.isComplete = false;
+                this.dom.inputData.value = '';
+                this.dom.inputType.value = 're';
+                this.dom.logOutput.innerHTML = '<p class="text-text-dim italic">Logs will appear here...</p>';
+                GraphManager.draw(null);
+                this.dom.tableContainer.classList.add('hidden');
+                this.dom.graphContainer.classList.remove('hidden');
+                this.handleInputTypeChange();
+                this.log('Application reset.', 'info');
+            },
+
+            updateButtonStates() {
+                const inputType = this.dom.inputType.value;
+                const hasGenerator = !!this.state.conversionGenerator;
+                
+                this.dom.btnReToNfa.disabled = inputType !== 're' || hasGenerator;
+                this.dom.btnNfaToDfa.disabled = inputType !== 'nfa' || hasGenerator;
+                this.dom.btnDfaMinimize.disabled = inputType !== 'dfa' || hasGenerator;
+                
+                this.dom.btnNextStep.disabled = !hasGenerator || this.state.isComplete;
+                this.dom.btnRunAll.disabled = !hasGenerator || this.state.isComplete;
+                this.dom.btnReset.disabled = !hasGenerator && !this.dom.inputData.value;
+                this.dom.inputType.disabled = hasGenerator;
+                this.dom.inputData.disabled = hasGenerator;
+            },
+            
+            handleInputTypeChange() {
+                const type = this.dom.inputType.value;
+                if (type === 're') {
+                    this.dom.inputData.placeholder = '(a|b)*a';
+                } else if (type === 'nfa' || type === 'dfa') {
+                    this.dom.inputData.placeholder = 'Enter automaton in JSON format...';
+                }
+                this.updateButtonStates();
+            },
+
+            startConversion(type) {
+                try {
+                    if (type === 're-to-nfa') {
+                        const re = this.dom.inputData.value;
+                        if (!re) throw new Error("Regular expression cannot be empty.");
+                        const explicitRe = ConversionEngine.insertExplicitConcat(re);
+                        const postfixRe = ConversionEngine.reToPostfix(explicitRe);
+                        this.state.conversionGenerator = ConversionEngine.thompson(postfixRe);
+                    } else if (type === 'nfa-to-dfa') {
+                        const nfa = JSON.parse(this.dom.inputData.value);
+                        this.state.conversionGenerator = ConversionEngine.subsetConstruction(nfa);
+                    } else if (type === 'dfa-minimize') {
+                        const dfa = JSON.parse(this.dom.inputData.value);
+                        this.state.conversionGenerator = ConversionEngine.minimizeDfaTableFilling(dfa);
+                    }
+                    this.dom.logOutput.innerHTML = '';
+                    this.log(`Starting conversion: ${type}`, 'info');
+                    this.handleNextStep();
+                } catch (e) {
+                    this.log(`Error: ${e.message}`, 'error');
+                    console.error(e);
+                }
+            },
+
+            handleNextStep() {
+                if (!this.state.conversionGenerator) return;
+                
+                const result = this.state.conversionGenerator.next();
+                
+                if (result.value) {
+                    if (result.value.log) this.log(result.value.log);
+
+                    if (result.value.automaton) {
+                        this.state.currentAutomaton = result.value.automaton;
+                        GraphManager.draw(this.state.currentAutomaton);
+                    } else if (result.value.table) {
+                        GraphManager.drawMinimizationTable(result.value.table);
+                    }
+                }
+                
+                if (result.done) {
+                    this.state.isComplete = true;
+                    if(result.value){
+                         this.log('Conversion process finished.', 'success');
+                         // The final automaton is the return value of the generator
+                         const finalAutomaton = result.value;
+                         this.state.currentAutomaton = finalAutomaton;
+                         this.dom.inputData.value = JSON.stringify(finalAutomaton, null, 2);
+                         if (this.dom.btnReToNfa.disabled) this.dom.inputType.value = 'nfa';
+                         if (this.dom.btnNfaToDfa.disabled) this.dom.inputType.value = 'dfa';
+                    } else {
+                         this.log('Conversion process finished.', 'success');
+                    }
+                }
+                
+                this.updateButtonStates();
+            },
+            
+            handleRunAll() {
+                if (!this.state.conversionGenerator) return;
+                
+                const run = () => {
+                    if (this.state.isComplete) return;
+                    this.handleNextStep();
+                    setTimeout(run, 200); // Delay for visualization
+                };
+                run();
+            },
+            
+            loadReExample() {
+                this.reset();
+                this.dom.inputType.value = 're';
+                this.dom.inputData.value = '(a|b)*a';
+                this.handleInputTypeChange();
+                this.updateButtonStates();
+            },
+            
+            loadNfaExample() {
+                this.reset();
+                this.dom.inputType.value = 'nfa';
+                this.dom.inputData.value = JSON.stringify({
+                    "states": ["q10", "q5", "q0", "q1", "q2", "q3", "q4", "q6", "q7", "q8", "q9"],
+                    "alphabet": ["a", "b"],
+                    "transitions": [
+                        {"from": "q10", "to": "q5", "symbol": "ε"},
+                        {"from": "q5", "to": "q0", "symbol": "ε"},
+                        {"from": "q5", "to": "q6", "symbol": "ε"},
+                        {"from": "q0", "to": "q1", "symbol": "ε"},
+                        {"from": "q0", "to": "q3", "symbol": "ε"},
+                        {"from": "q1", "to": "q2", "symbol": "a"},
+                        {"from": "q3", "to": "q4", "symbol": "b"},
+                        {"from": "q2", "to": "q5", "symbol": "ε"},
+                        {"from": "q4", "to": "q5", "symbol": "ε"},
+                        {"from": "q6", "to": "q7", "symbol": "ε"},
+                        {"from": "q7", "to": "q8", "symbol": "a"},
+                        {"from": "q8", "to": "q9", "symbol": "ε"}
+                    ],
+                    "startState": "q10",
+                    "finalStates": ["q9"]
+                }, null, 2);
+                this.handleInputTypeChange();
+                this.updateButtonStates();
+            },
+            
+            loadDfaExample() {
+                this.reset();
+                this.dom.inputType.value = 'dfa';
+                this.dom.inputData.value = JSON.stringify({
+                    "states": ["A", "B", "C", "D", "E", "F", "G", "H"],
+                    "alphabet": ["0", "1"],
+                    "transitions": [
+                        {"from": "A", "to": "B", "symbol": "0"}, {"from": "A", "to": "F", "symbol": "1"},
+                        {"from": "B", "to": "G", "symbol": "0"}, {"from": "B", "to": "C", "symbol": "1"},
+                        {"from": "C", "to": "A", "symbol": "0"}, {"from": "C", "to": "C", "symbol": "1"},
+                        {"from": "D", "to": "C", "symbol": "0"}, {"from": "D", "to": "G", "symbol": "1"},
+                        {"from": "E", "to": "H", "symbol": "0"}, {"from": "E", "to": "F", "symbol": "1"},
+                        {"from": "F", "to": "C", "symbol": "0"}, {"from": "F", "to": "G", "symbol": "1"},
+                        {"from": "G", "to": "G", "symbol": "0"}, {"from": "G", "to": "E", "symbol": "1"},
+                        {"from": "H", "to": "G", "symbol": "0"}, {"from": "H", "to": "C", "symbol": "1"}
+                    ],
+                    "startState": "A",
+                    "finalStates": ["C"]
+                }, null, 2);
+                this.handleInputTypeChange();
+                this.updateButtonStates();
+            }
+        };
+
+        // Initialize the application when the DOM is ready
+        document.addEventListener('DOMContentLoaded', () => {
+            AppController.init();
+        });
+
+    })();
+    </script>
+
+</body>
+</html>
