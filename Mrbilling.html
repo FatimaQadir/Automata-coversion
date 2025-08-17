@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mr Crispy - Billing</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #fff8f0;
+    }
+    header {
+      background: #eac406;
+      color: white;
+      padding: 10px;
+      text-align: center;
+    }
+    .menu {
+      padding: 10px;
+      max-height: 50vh;
+      overflow-y: scroll;
+      margin-bottom: 45vh;
+    }
+    .category {
+      margin-bottom: 20px;
+    }
+    .category h3 {
+      background: #fcbf49;
+      padding: 12px 18px;
+      border-radius: 12px;
+      cursor: pointer;
+      user-select: none;
+      margin-bottom: 0;
+      font-size: 1.2rem;
+      font-weight: 700;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+      border-left: 6px solid #f77f00;
+      transition: background 0.2s, box-shadow 0.2s, transform 0.15s;
+    }
+    .category.collapsed .grouped-items {
+      display: none;
+    }
+    .grouped-items {
+      margin-bottom: 10px;
+      margin-top: 0;
+    }
+    .item-group {
+      margin: 8px 0;
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .item-group-label {
+      min-width: 100px;
+      font-weight: 500;
+      margin-right: 10px;
+    }
+    .size-btn {
+      margin: 2px 6px 2px 0;
+      padding: 5px 14px;
+      border: none;
+      border-radius: 5px;
+      background: #f77f00;
+      color: white;
+      cursor: pointer;
+      font-size: 0.95rem;
+      transition: background 0.2s;
+    }
+    .size-btn:hover {
+      background: #fcbf49;
+      color: #333;
+    }
+    .item {
+      background: white;
+      border: 1px solid #ccc;
+      border-radius: 10px;
+      padding: 10px;
+      margin: 5px 0;
+      cursor: pointer;
+      box-shadow: 0 0 5px #999;
+    }
+    .item:hover {
+      background: #f8f8f8;
+    }
+    .bill-panel {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #333;
+  color: white;
+  padding: 15px;
+  max-height: 40vh;
+  overflow: hidden; /* changed from auto to hidden */
+  z-index: 999;
+  box-shadow: 0 -2px 10px rgba(0,0,0,0.3);
+  display: flex;
+  flex-direction: column;
+}
+
+.bill-items {
+  flex: 1 1 auto;
+  min-height: 0;
+  /* 3 items ki height (approx 3 x 40px) */
+  max-height: 130px;
+  overflow-y: auto;
+  margin-bottom: 15px;
+  padding-right: 10px;
+}
+    .bill-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: none;
+      margin-bottom: 8px;
+      padding: 6px 0;
+    }
+    .bill-item span {
+      flex: 1;
+      font-size: 1rem;
+    }
+    .bill-item button {
+      margin-left: 12px;
+      background: #f77f00;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      padding: 4px 12px;
+      cursor: pointer;
+      font-size: 0.95rem;
+      transition: background 0.2s;
+    }
+    .bill-item button:hover {
+      background: #fcbf49;
+      color: #333;
+    }
+    .actions {
+      margin-top: 10px;
+      display: flex;
+      justify-content: space-between;
+    }
+    button {
+      padding: 8px 12px;
+      border: none;
+      border-radius: 5px;
+      background: #f77f00;
+      color: white;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #fcbf49;
+    }
+  </style>
+</head>
+<body>
+  <header style="background: #fcbf49; color: white; padding: 10px; text-align: center;">
+    <img src="logo.jpg.jpeg" alt="Mr Crispy Logo" style="height: 80px; display: block; margin: auto; margin-bottom: 8px;">
+    <h1 style="text-align:center; margin: 0;">Mr Crispy</h1>
+  </header>
+
+  <div class="menu" id="menu"></div>
+
+  <div class="bill-panel" id="billPanel">
+    <h2>Bill</h2>
+    <div style="display: flex; flex-direction: row; align-items: flex-start; gap: 20px; justify-content: center;">
+      <div class="bill-items" id="billItems" style="min-width: 200px; max-width: 300px;"></div>
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 10px; min-width: 150px;">
+        <p style="margin-bottom: 0;"><strong>Total:</strong> Rs. <span id="total">0</span></p>
+        <button onclick="clearBill()">Clear Bill</button>
+        <button onclick="printBill()">Print</button>
+        <button onclick="showBillHistory()">View Bill History</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const menuData = {
+      "Pizza": [
+        { name: "Tikka (S)", price: 500 }, { name: "Tikka (M)", price: 950 }, { name: "Tikka (L)", price: 1450 },
+        { name: "Fajita (S)", price: 500 }, { name: "Fajita (M)", price: 950 }, { name: "Fajita (L)", price: 1450 },
+        { name: "Peri Peri (S)", price: 500 }, { name: "Peri Peri (M)", price: 950 }, { name: "Peri Peri (L)", price: 1450 },
+        { name: "Malai Boti (S)", price: 600 }, { name: "Malai Boti (M)", price: 1200 }, { name: "Malai Boti (L)", price: 1800 },
+        { name: "Vegetable (S)", price: 450 }, { name: "Vegetable (M)", price: 750 }, { name: "Vegetable (L)", price: 1300 },
+        { name: "Chipotle (S)", price: 550 }, { name: "Chipotle (M)", price: 1000 }, { name: "Chipotle (L)", price: 1500 }
+      ],
+      "Special Pizzas": [
+        { name: "Lasania (M)", price: 1150 }, { name: "Lasania (L)", price: 1650 },
+        { name: "Chicken Cheese Stuff (M)", price: 1300 }, { name: "Chicken Cheese Stuff (L)", price: 1800 },
+        { name: "Behari Pizza (M)", price: 1300 }, { name: "Behari Pizza (L)", price: 1800 },
+        { name: "Kabab Stuffer (M)", price: 1300 }, { name: "Kabab Stuffer (L)", price: 1800 },
+        { name: "Crown Pizza (M)", price: 1350 }, { name: "Crown Pizza (L)", price: 1850 }
+      ],
+      "Wraps": [
+        { name: "Chicken Tortilla", price: 550 }, { name: "Fillet Wrap / Grill Wrap", price: 550 }
+      ],
+      "Burgers": [
+        { name: "Zinger", price: 350 }, { name: "Red Hot Zinger", price: 450 }, { name: "Tower/ Jumbo", price: 600 },
+        { name: "Grill Burger", price: 500 }, { name: "Cheesy Meat Burger", price: 500 }, { name: "Patty Burger", price: 250 }
+      ],
+      "Fries": [
+        { name: "Loaded Fries", price: 550 }, { name: "Pizza Fries", price: 550 },
+        { name: "Cheesy Mayo Fries", price: 480 }, { name: "Plain Fries / Regular Fries", price: 280 }, { name: "Family Pack", price: 490 }
+      ],
+      "Pasta": [
+        { name: "Creamy Pasta", price: 750 }, { name: "Mac & Cheese Pasta", price: 750 }, { name: "Crunchy Pasta", price: 750 }
+      ],
+      "Paratha Rolls": [
+        { name: "Desi Pratha Roll", price: 250 }, { name: "Chicken Cheese Pratha", price: 300 },
+        { name: "Malai Boti Pratha", price: 350 }, { name: "Zinger Pratha Roll", price: 3500 }
+      ],
+      "Shawarma": [
+        { name: "Chicken Shawarma", price: 200 }, { name: "Chicken Cheese Shawarma", price: 300 },
+        { name: "Zinger Shawarma", price: 350 }, { name: "Special Shawarma", price: 350 }, { name: "Shawarma Platter", price: 550 }
+      ],
+      "Sandwiches": [
+        { name: "Club Sandwich", price: 350 }, { name: "Chicken Cheese Sandwich", price: 350 }, { name: "Grilled Sandwich", price: 400 }
+      ],
+      "Wings": [
+        { name: "Baked Oven Wings (10 pcs)", price: 590 }, { name: "Crispy Wings (6 pcs)", price: 500 }
+      ],
+      "Snacks": [
+        { name: "Nuggets (8 pcs)", price: 500 }, { name: "Fried Sandwich (2 pcs)", price: 350 }, { name: "Tender Pops (8 pcs)", price: 500 }
+      ],
+      "Deals": [
+        { name: "Deal 1: Zinger Burger + Fries + Drink", price: 650 },
+        { name: "Deal 2: 2 Zinger Burgers + 1/2L Drink", price: 780 },
+        { name: "Deal 3: 2 Grill + 2 Zinger + L Drink", price: 2050 },
+        { name: "Deal 4: Special Shawarma + Drink + Sauce", price: 450 },
+        { name: "Deal 6: Red Hot Zinger + Grill + 1/2L Drink", price: 1050 },
+        { name: "Deal 7: 2 Desi + 2 Zinger Pratha", price: 1300 },
+        { name: "Deal 8: Small Pizza + Drink", price: 560 },
+        { name: "Deal 9: Medium Pizza + 1/2L Drink", price: 1050 },
+        { name: "Deal 10: Large Pizza + L Drink", price: 1599 },
+        { name: "Deal 11: 2 Large Pizzas + 1/2L Drink + Family Fries", price: 3999 }
+      ],
+      "Party Deal": [
+        { name: "2 Large Pizzas + 1/2L Drink + Family Fries + Wings", price: 3999 },
+        { name: "4 Grill + 4 Zinger + 1/2L Drink + Family Fries + 2 Dips", price: 4200 },
+        { name: "Large Pizza + Zinger Burger + Shawarma / Pratha", price: 2300 }
+      ],
+      "Mid Night Deal": [
+        { name: "2 Medium Pizzas + 1L Drink (10PM-1AM)", price: 0 },
+        { name: "Large Pizza + 1/2L Drink (Free)", price: 0 }
+      ],
+      "Dips": [
+        { name: "Burger Sauce", price: 50 }, { name: "Garlic Sauce", price: 50 },
+        { name: "Chipotle Sauce", price: 50 }, { name: "Honey Mustard", price: 50 }
+      ],
+      "Toppings": [
+        { name: "Cheese Slice", price: 50 }, { name: "Extra Cheese (Pizza)", price: 100 }
+      ]
+    };
+
+    const menuDiv = document.getElementById('menu');
+    const billItemsDiv = document.getElementById('billItems');
+    const totalSpan = document.getElementById('total');
+    const bill = [];
+
+    function groupItemsByName(items) {
+      // Returns { baseName: [{size, price}] }
+      const groups = {};
+      items.forEach(item => {
+        // Extract base name and size (e.g. Tikka (S) => Tikka, S)
+        const match = item.name.match(/^(.*) \(([^)]+)\)$/);
+        if (match) {
+          const base = match[1].trim();
+          const size = match[2].trim();
+          if (!groups[base]) groups[base] = [];
+          groups[base].push({ size, price: item.price });
+        } else {
+          // No size, just use name
+          if (!groups[item.name]) groups[item.name] = [];
+          groups[item.name].push({ size: '', price: item.price });
+        }
+      });
+      return groups;
+    }
+
+    function loadMenu() {
+      menuDiv.innerHTML = '';
+      for (const category in menuData) {
+        const catDiv = document.createElement('div');
+        catDiv.className = 'category collapsed';
+        const h3 = document.createElement('h3');
+        h3.textContent = category;
+        h3.onclick = () => {
+          catDiv.classList.toggle('collapsed');
+        };
+        catDiv.appendChild(h3);
+
+        const grouped = groupItemsByName(menuData[category]);
+        const groupedItemsDiv = document.createElement('div');
+        groupedItemsDiv.className = 'grouped-items';
+        for (const base in grouped) {
+          const groupDiv = document.createElement('div');
+          groupDiv.className = 'item-group';
+          const label = document.createElement('span');
+          label.className = 'item-group-label';
+          label.textContent = base;
+          groupDiv.appendChild(label);
+          grouped[base].forEach(opt => {
+            const btn = document.createElement('button');
+            btn.className = 'size-btn';
+            btn.textContent = opt.size ? opt.size : 'Select';
+            btn.onclick = () => addToBill({ name: base + (opt.size ? ` (${opt.size})` : ''), price: opt.price });
+            groupDiv.appendChild(btn);
+          });
+          groupedItemsDiv.appendChild(groupDiv);
+        }
+        catDiv.appendChild(groupedItemsDiv);
+        menuDiv.appendChild(catDiv);
+      }
+    }
+
+    function addToBill(item) {
+      bill.push(item);
+      updateBill();
+    }
+
+    function removeItem(index) {
+      bill.splice(index, 1);
+      updateBill();
+    }
+
+    function removeItemByText(itemText) {
+      // Find and remove one instance of the item
+      const itemName = itemText.split(' - Rs. ')[0];
+      const itemPrice = parseInt(itemText.split('Rs. ')[1]);
+      
+      for (let i = 0; i < bill.length; i++) {
+        if (bill[i].name === itemName && bill[i].price === itemPrice) {
+          bill.splice(i, 1);
+          break;
+        }
+      }
+      updateBill();
+    }
+
+    function updateBill() {
+      billItemsDiv.innerHTML = '';
+      let total = 0;
+      
+      // Group items by name and count quantities
+      const itemCounts = {};
+      bill.forEach(item => {
+        const key = `${item.name} - Rs. ${item.price}`;
+        itemCounts[key] = (itemCounts[key] || 0) + 1;
+      });
+      
+      // Display grouped items with quantities
+      Object.entries(itemCounts).forEach(([itemText, count], index) => {
+        const div = document.createElement('div');
+        div.className = 'bill-item';
+        const displayText = count > 1 ? `${itemText} (*${count})` : itemText;
+        div.innerHTML = `
+          <span>${displayText}</span>
+          <button onclick="removeItemByText('${itemText}')">Undo</button>
+        `;
+        billItemsDiv.appendChild(div);
+        
+        // Calculate total for this item
+        const price = parseInt(itemText.split('Rs. ')[1]);
+        total += price * count;
+      });
+      
+      totalSpan.innerText = total;
+    }
+
+    function clearBill() {
+      bill.length = 0;
+      updateBill();
+    }
+
+    function printBill() {
+      const billDate = new Date();
+      const billData = {
+        date: billDate.toLocaleString(),
+        items: [...bill],
+        total: bill.reduce((sum, i) => sum + i.price, 0)
+      };
+
+      saveBillToHistory(billData);
+
+      const billContent = `
+        <html><head><title>Print</title>
+        <style>
+          body { background: #fff8f0; margin: 0; }
+          .print-bill-container {
+            max-width: 400px;
+            margin: 40px auto;
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 2px 16px rgba(0,0,0,0.12);
+            padding: 32px 24px;
+            text-align: center;
+            font-family: Arial, sans-serif;
+          }
+          .print-bill-logo { height: 80px; margin-bottom: 12px; }
+          .print-bill-title { color: #eac406; margin: 0 0 8px 0; font-size: 2rem; }
+          .print-bill-date { color: #888; font-size: 1rem; margin-bottom: 18px; }
+          .print-bill-items { text-align: left; margin: 0 auto 18px auto; max-width: 300px; }
+          .print-bill-items p { margin: 0 0 6px 0; font-size: 1.1rem; }
+          .print-bill-total { border-top: 1px solid #eee; margin-top: 18px; padding-top: 12px; font-size: 1.2rem; font-weight: bold; color: #333; }
+        </style>
+        </head><body>
+        <div class="print-bill-container">
+          <img src="logo.jpg.jpeg" class="print-bill-logo">
+          <h1 class="print-bill-title">Mr Crispy</h1>
+          <div class="print-bill-date"><strong>Date:</strong> ${billData.date}</div>
+          <div class="print-bill-items">
+            ${billData.items.map(item => `<p>${item.name} - Rs. ${item.price}</p>`).join('')}
+          </div>
+          <div class="print-bill-total">Total: Rs. ${billData.total}</div>
+        </div>
+        </body></html>
+      `;
+      const printWindow = window.open('', '', 'width=800,height=600');
+      printWindow.document.write(billContent);
+      printWindow.document.close();
+      printWindow.print();
+    }
+
+    function saveBillToHistory(newBill) {
+      const history = JSON.parse(localStorage.getItem('billHistory') || '[]');
+      history.push(newBill);
+      const cutoff = Date.now() - (30 * 24 * 60 * 60 * 1000);
+      const filtered = history.filter(b => new Date(b.date).getTime() >= cutoff);
+      localStorage.setItem('billHistory', JSON.stringify(filtered));
+    }
+
+    function showBillHistory() {
+      const history = JSON.parse(localStorage.getItem('billHistory') || '[]');
+      if (history.length === 0) {
+        alert("No bills found from last 30 days.");
+        return;
+      }
+      let content = '<h2>Bill History</h2>';
+      history.reverse().forEach(bill => {
+        content += `<div style='border:1px solid #ccc; padding:8px; margin:5px;'>
+          <strong>${bill.date}</strong><br>
+          ${bill.items.map(i => `${i.name} - Rs. ${i.price}`).join('<br>')}<br>
+          <strong>Total: Rs. ${bill.total}</strong>
+        </div>`;
+      });
+      const win = window.open('', '', 'width=500,height=600');
+      win.document.write(`<html><head><title>Bill History</title></head><body>${content}</body></html>`);
+    }
+
+    loadMenu();
+  </script>
+</body>
+</html>
